@@ -44,6 +44,7 @@ gulp.task('watch:example', function(){
 gulp.task('scripts', scripts(paths.scripts));
 gulp.task('scripts:example', scripts(paths.example.scripts));
 function scripts(path, concat) {
+  console.log('running scripts');
   return function() {
     return gulp.src(path.src)
       .pipe(plugins.sourcemaps.init())

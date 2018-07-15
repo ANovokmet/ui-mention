@@ -15,16 +15,41 @@ angular.module('example', ['ui.mention'])
        * @todo Try to avoid using a regex match object
        * @return {array[choice]|Promise} The list of possible choices
        */
-      uiMention.findChoices = function(match, mentions) {
-        return choices
-          // Remove items that are already mentioned
-          .filter( choice => !mentions.some( mention => mention.id === choice.id ) )
-          // Matches items from search query
-          .filter( choice => ~`${choice.first} ${choice.last}`.indexOf(match[1]) );
-      };
+      uiMention.setConfig(
+        [
+          {
+            findChoices: function(match, mentions) {
+              return choices
+              // Remove items that are already mentioned
+              .filter( choice => !mentions.some( mention => mention.id === choice.id ) )
+              // Matches items from search query
+              .filter( choice => ~`${choice.first} ${choice.last}`.indexOf(match[1]) );
+            }
+          },
+          {
+            delimiter: '#',
+            findChoices: function(match, mentions) {
+              return hashTags
+              .filter( choice => ~`${choice.tag}`.indexOf(match[1]) );
+            },
+            label: function(item) {
+              return item.tag;
+            },
+            highlight: function(choice) {
+              return `<span class="tag">${choice.tag}</span>`;
+            }
+          }
+        ]
+      );
     }
   };
 });
+
+var hashTags = [
+  { tag: 'yolo', id:1 },
+  { tag: 'jpndts', id:2 },
+  { tag: 'jklol', id:3 }
+];
 
 var choices = [
   { first: 'bob', last: 'barker', id:11123 },

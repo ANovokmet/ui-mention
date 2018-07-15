@@ -28,7 +28,7 @@
     <ul ng-if="$mention.choices.length" class="dropdown">
       <li ng-repeat="choice in $mention.choices" ng-class="{active:$mention.activeChoice==choice}">
         <a ng-click="$mention.select(choice)">
-          {{::choice.first}} {{::choice.last}}
+          {{::choice.first}} {{::choice.last}} {{::choice.tag}}
         </a>
       </li>
     </ul>
@@ -38,6 +38,14 @@
 
   <p>
     $mentions.mentions: {{$mention.mentions | json}}
+  </p>
+
+  <p>
+    $mentions.config[0].mentions: {{$mention.config[0].mentions | json}}
+  </p>
+
+  <p>
+    $mentions.config[1].mentions: {{$mention.config[1].mentions | json}}
   </p>
 
   <p>

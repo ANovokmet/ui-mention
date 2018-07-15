@@ -11,6 +11,78 @@ angular.module('ui.mention')
 
   this.decodePattern = new RegExp(this.delimiter + "\[[\\s\\w]+:[0-9a-z-]+\]", "gi");
 
+  
+  this.currentConfig = undefined;
+
+  this.config = this.config && this.config.map((config) => getDefaultConfig(config)) || [getDefaultConfig()]
+  this.setConfig = function(configs) {
+    this.config = configs && configs.map((config) => getDefaultConfig(config)) || [getDefaultConfig()]
+
+    
+    for(var i = 0; i < this.config.length; i++) {
+      let config = this.config[i];
+
+      ngModel.$parsers.push( value => {
+        // Removes any mentions that aren't used
+        config.mentions = config.mentions.filter( mention => {
+          if (~value.indexOf(config.label(mention))){
+            return value = value.replace(config.label(mention), config.encode(mention));
+          }
+        });
+  
+        this.render(value);
+  
+        return value;
+      });
+  
+      ngModel.$formatters.push( (value = '') => {
+        // In case the value is a different primitive
+        value = value.toString();
+  
+        // Removes any mentions that aren't used
+        config.mentions = config.mentions.filter( mention => {
+          if (~value.indexOf(config.encode(mention))) {
+            value = value.replace(config.encode(mention), config.label(mention));
+            return true;
+          } else {
+            return false;
+          }
+        });
+  
+        return value;
+      });
+    }
+  }
+
+  function getDefaultConfig(config) {
+    config = config || {};
+
+    let delimiter = config.delimiter || '@';
+    let label = config.label || function(choice) {
+      return `${choice.first} ${choice.last}`;
+    }
+
+
+    return {
+      delimiter: delimiter,
+      searchPattern: config.searchPattern || new RegExp("(?:\\s+|^)" + delimiter + "(\\w+(?: \\w+)?)$"),
+      decodePattern: config.decodePattern || new RegExp(delimiter + "\[[\\s\\w]+:[0-9a-z-]+\]", "gi"),
+      label: label,
+      findChoices: config.findChoices || function (match, mentions) {
+        return [];
+      },
+      encode: config.encode || function(choice) {
+        return `${delimiter}[${label(choice)}:${choice.id}]`;
+      },
+      mentions: [],
+      highlight: config.highlight || function(choice) {
+        return `<span>${label(choice)}</span>`;
+      }
+    }
+  }
+  
+  
+
   this.$element = $element;
   this.choices = [];
   this.mentions = [];
@@ -29,11 +101,14 @@ angular.module('ui.mention')
 
     ngModel = model;
 
-    ngModel.$parsers.push( value => {
+    
+    /*ngModel.$parsers.push( value => {
       // Removes any mentions that aren't used
       this.mentions = this.mentions.filter( mention => {
-       if (~value.indexOf(this.label(mention)))
-          return value = value.replace(this.label(mention), this.encode(mention));
+       if (~value.indexOf(this.currentConfig.label(mention))){
+
+        return value = value.replace(this.currentConfig.label(mention), this.currentConfig.encode(mention));
+      }
       });
 
       this.render(value);
@@ -47,8 +122,8 @@ angular.module('ui.mention')
 
       // Removes any mentions that aren't used
       this.mentions = this.mentions.filter( mention => {
-        if (~value.indexOf(this.encode(mention))) {
-          value = value.replace(this.encode(mention), this.label(mention));
+        if (~value.indexOf(this.currentConfig.encode(mention))) {
+          value = value.replace(this.currentConfig.encode(mention), this.currentConfig.label(mention));
           return true;
         } else {
           return false;
@@ -56,7 +131,7 @@ angular.module('ui.mention')
       });
 
       return value;
-    });
+    });*/
 
     ngModel.$render = () => {
       $element.val(ngModel.$viewValue || '');
@@ -87,9 +162,19 @@ angular.module('ui.mention')
     html = (html || '').toString();
     // Convert input to text, to prevent script injection/rich text
     html = parseContentAsText(html);
-    this.mentions.forEach( mention => {
-      html = html.replace(this.encode(mention), this.highlight(mention));
+
+    /*this.mentions.forEach( mention => {
+      html = html.replace(this.currentConfig.encode(mention), this.highlight(mention));
+    });*/
+
+    this.config.forEach(config => {
+      config.mentions.forEach(mention => {
+        var encode = config.encode(mention)
+        var highlight = config.highlight(mention)
+        html = html.replace(config.encode(mention), config.highlight(mention));
+      });
     });
+
     this.renderElement().html(html);
     return html;
   };
@@ -114,7 +199,7 @@ angular.module('ui.mention')
    * @return {string}              HTML highlighted version of the choice
    */
   this.highlight = function(choice) {
-    return `<span>${this.label(choice)}</span>`;
+    return `<span>${this.currentConfig.label(choice)}</span>`;
   };
 
   /**
@@ -124,6 +209,7 @@ angular.module('ui.mention')
    * @param  {string} [text] syntax encoded string (default: ngModel.$modelValue)
    * @return {string}        plaintext string with encoded labels used
    */
+  //use for one way formatting
   this.decode = function(value = ngModel.$modelValue) {
     return value ? value.replace(this.decodePattern, '$1') : '';
   };
@@ -149,7 +235,7 @@ angular.module('ui.mention')
    * @return {string}              Syntax-encoded string version of choice
    */
   this.encode = function(choice) {
-    return `${this.delimiter}[${this.label(choice)}:${choice.id}]`;
+    return `${this.currentConfig.delimiter}[${this.currentConfig.label(choice)}:${choice.id}]`;
   };
 
   /**
@@ -162,12 +248,13 @@ angular.module('ui.mention')
    * @param  {string} [text]         String to perform the replacement on (default: ngModel.$viewValue)
    * @return {string}                Human-readable string
    */
+  //dont replace with label, but with encoded value
   this.replace = function(mention, search = this.searching, text = ngModel.$viewValue) {
     // TODO: come up with a better way to detect what to remove
     // TODO: consider alternative to using regex match
-    text = text.substr(0, search.index + search[0].indexOf(this.delimiter)) +
-           this.label(mention) + ' ' +
-           text.substr(search.index + search[0].length);
+    text = text.substr(0, search.index + search[0].indexOf(this.currentConfig.delimiter)) +
+            this.currentConfig.label(mention) + ' ' +
+            text.substr(search.index + search[0].length);
     return text;
   };
 
@@ -184,7 +271,7 @@ angular.module('ui.mention')
     }
 
     // Add the mention
-    this.mentions.push(choice);
+    this.currentConfig.mentions.push(choice);
 
     // Replace the search with the label
     ngModel.$setViewValue(this.replace(choice));
@@ -236,7 +323,7 @@ angular.module('ui.mention')
   this.search = function(match) {
     this.searching = match;
 
-    return $q.when( this.findChoices(match, this.mentions) )
+    return $q.when( this.currentConfig.findChoices(match, this.currentConfig.mentions) )
       .then( choices => {
         this.choices = choices;
         this.activeChoice = choices[0];
@@ -283,11 +370,18 @@ angular.module('ui.mention')
       return;
     let text = $element.val();
     // text to left of cursor ends with `@sometext`
-    let match = this.searchPattern.exec(text.substr(0, $element[0].selectionStart));
 
-    if (match) {
-      this.search(match);
-    } else {
+    let match;
+    for(var i = 0; i < this.config.length; i++){
+      match = this.config[i].searchPattern.exec(text.substr(0, $element[0].selectionStart));
+      if(match){
+        this.currentConfig = this.config[i];
+        this.search(match);
+        break;
+      }
+    }
+
+    if (!match) {
       this.cancel();
     }
 
